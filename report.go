@@ -2,6 +2,7 @@ package report
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -107,6 +108,11 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 	}, nil
 }
 
+// Base returns a copy of base frame.
+func (a *Report) Base() *dt.Frame {
+	return a.base.Copy(false)
+}
+
 // Feed feeds a file to report.
 func (a *Report) Feed(name string) (time.Time, error) {
 	date, data, err := a.feed(name)
@@ -133,4 +139,91 @@ func (a *Report) Feed(name string) (time.Time, error) {
 	}
 	os.Remove(bak)
 	return date, nil
+}
+
+// Stat statistics data from s to e.
+func (a *Report) Stat(s, e time.Time) (dt.List, error) {
+	skey, ekey := FormatDate(s.AddDate(0, 0, -1)), FormatDate(e.AddDate(0, 0, -1))
+	if !a.data.Has(skey) {
+		return nil, errors.New("report.Stat: data not found: " + skey)
+	}
+	if !a.data.Has(ekey) {
+		return nil, errors.New("report.Stat: data not found: " + ekey)
+	}
+
+	adjust := a.adjust.Filter(func(r dt.Record) bool {
+		date, err := ParseDate(r.String("DATE"))
+		if err != nil {
+			return false
+		}
+		return !date.Before(s) && date.Before(e)
+	}).GroupBy("CODE").Apply("VALUE", "VALUE", dt.Sum).Do()
+
+	return a.base.Join(adjust, "CODE").Do("A_").
+		Set("S_VALUE", a.data.Get(skey)).
+		Set("E_VALUE", a.data.Get(ekey)).
+		FillNA(dt.Number(0), "A_VALUE").
+		MapTo("VALUE", func(r dt.Record) dt.Value {
+			return dt.Number(r.Number("A_VALUE") + r.Number("E_VALUE") - r.Number("S_VALUE"))
+		}).Get("VALUE"), nil
+}
+
+// Target gets the target from s to e.
+func (a *Report) Target(s, e time.Time) (dt.List, error) {
+	svalues, err := a.Stat(a.sdate, s)
+	if err != nil {
+		return nil, err
+	}
+	starget, err := a.TargetBy(s)
+	if err != nil {
+		return nil, err
+	}
+	etarget, err := a.TargetBy(e)
+	if err != nil {
+		return nil, err
+	}
+	return a.base.Pick("TARGET").
+		Set("VALUE", svalues).Set("S_TARGET", starget).Set("E_TARGET", etarget).
+		Map(func(r dt.Record) dt.Value {
+			et, st, t, v := r.Number("E_TARGET"), r.Number("S_TARGET"), r.Number("TARGET"), r.Number("VALUE")
+			rt := (et - st) * (t - v) / (t - st)
+			if rt > 0 {
+				return dt.Number(rt)
+			}
+			return dt.Number(0)
+		}), nil
+}
+
+// StatBy statistics data from start time to e.
+func (a *Report) StatBy(e time.Time) (dt.List, error) {
+	return a.Stat(a.sdate, e)
+}
+
+// TargetBy gets the target from start time to e.
+func (a *Report) TargetBy(e time.Time) (dt.List, error) {
+	dates := a.schedule.Get("DATE")
+	values := a.schedule.Get("VALUE")
+
+	k := math.NaN()
+	d1, err := ParseDate(dates[0].String())
+	if err != nil {
+		return nil, err
+	}
+	for i := 1; i < len(dates); i++ {
+		d2, err := ParseDate(dates[i].String())
+		if err != nil {
+			return nil, err
+		}
+		if d2.After(e) {
+			v1, v2 := values[i-1].Number(), values[i].Number()
+			k = v1 + (v2-v1)*(e.Sub(d1).Hours())/(d2.Sub(d1).Hours())
+			break
+		}
+		d1 = d2
+	}
+
+	return a.base.Pick("TARGET").
+		Map(func(r dt.Record) dt.Value {
+			return dt.Number(k * r.Number("TARGET"))
+		}), nil
 }
