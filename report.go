@@ -2,6 +2,7 @@ package report
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -14,17 +15,24 @@ import (
 type Report struct {
 	path     string
 	feed     func(name string) (time.Time, *dt.Frame, error)
-	group    func(frame *dt.Frame) *dt.Frame
+	group    func(base, data *dt.Frame) *dt.Frame
 	sdate    time.Time
 	edate    time.Time
-	base     *dt.Frame // CODE[, NAME], SUPER, TARGET
+	base     *dt.Frame // CODE[, NAME], LEVEL, SUPER, TARGET
 	data     *dt.Frame // CODE, 20060102, ...
 	schedule *dt.Frame // DATE, VALUE
 	adjust   *dt.Frame // DATE, CODE[, NAME], VALUE
 }
 
 // Load loads the report.
-func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group func(*dt.Frame) *dt.Frame) (*Report, error) {
+func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group func(*dt.Frame, *dt.Frame) *dt.Frame) (*Report, error) {
+	if feed == nil {
+		return nil, errors.New("report.Load: feed can't be nil")
+	}
+	if group == nil {
+		group = Group
+	}
+
 	cr, xr := csv.NewReader(), xlsx.NewReader()
 
 	base, err := xr.ReadFile(filepath.Join(path, "base.xlsx"))
@@ -35,6 +43,7 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 		return nil, err
 	}
 	base.Get("CODE").String()
+	base.Get("LEVEL").Number()
 	base.Get("SUPER").String()
 	base.Get("TARGET").Number()
 
@@ -96,4 +105,32 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 		schedule: schedule,
 		adjust:   adjust,
 	}, nil
+}
+
+// Feed feeds a file to report.
+func (a *Report) Feed(name string) (time.Time, error) {
+	date, data, err := a.feed(name)
+	if err != nil {
+		return date, err
+	}
+	if err := data.Check("CODE", "VALUE"); err != nil {
+		return date, err
+	}
+	data.Get("CODE").String()
+	data = a.group(a.base, data.Pick("CODE", "VALUE"))
+	a.data.Set(FormatDate(date), data.Get("VALUE"))
+
+	path := filepath.Join(a.path, "data.csv")
+	bak, err := bakup(path)
+	if err != nil {
+		return date, err
+	}
+	err = csv.NewWriter().WriteFile(a.data, path)
+	if err != nil {
+		os.Remove(path)
+		os.Rename(bak, path)
+		return date, err
+	}
+	os.Remove(bak)
+	return date, nil
 }
