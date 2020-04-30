@@ -19,10 +19,10 @@ type Report struct {
 	group    func(base, data *dt.Frame) *dt.Frame
 	sdate    time.Time
 	edate    time.Time
-	base     *dt.Frame // CODE[, NAME], LEVEL, SUPER, TARGET
-	data     *dt.Frame // CODE, 20060102, ...
+	base     *dt.Frame // ID[, NAME], LEVEL, SUPER, TARGET
+	data     *dt.Frame // ID, 20060102, ...
 	schedule *dt.Frame // DATE, VALUE
-	adjust   *dt.Frame // DATE, CODE[, NAME], VALUE
+	adjust   *dt.Frame // DATE, ID[, NAME], VALUE
 }
 
 // Load loads the report.
@@ -40,10 +40,10 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 	if err != nil {
 		return nil, err
 	}
-	if err := base.Check("CODE", "SUPER", "TARGET"); err != nil {
+	if err := base.Check("ID", "SUPER", "TARGET"); err != nil {
 		return nil, err
 	}
-	base.Get("CODE").String()
+	base.Get("ID").String()
 	base.Get("LEVEL").Number()
 	base.Get("SUPER").String()
 	base.Get("TARGET").Number()
@@ -52,13 +52,13 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 	if err != nil {
 		return nil, err
 	}
-	if err := data.Check("CODE"); err != nil {
+	if err := data.Check("ID"); err != nil {
 		return nil, err
 	}
-	data.Get("CODE").String()
-	data = base.Pick("CODE").Rename("CODE", "BCODE").
-		Join(data, "CODE").On("BCODE").Do("").
-		Del("CODE").Rename("BCODE", "CODE").
+	data.Get("ID").String()
+	data = base.Pick("ID").Rename("ID", "BID").
+		Join(data, "ID").On("BID").Do("").
+		Del("ID").Rename("BID", "ID").
 		FillNA(dt.Number(0))
 
 	schedule, err := xr.ReadFile(filepath.Join(path, "schedule.xlsx"))
@@ -90,10 +90,10 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 	if err != nil {
 		return nil, err
 	}
-	if err := adjust.Check("DATE", "CODE", "VALUE"); err != nil {
+	if err := adjust.Check("DATE", "ID", "VALUE"); err != nil {
 		return nil, err
 	}
-	adjust.Get("CODE").String()
+	adjust.Get("ID").String()
 
 	return &Report{
 		path:     path,
@@ -119,11 +119,11 @@ func (a *Report) Feed(name string) (time.Time, error) {
 	if err != nil {
 		return date, err
 	}
-	if err := data.Check("CODE", "VALUE"); err != nil {
+	if err := data.Check("ID", "VALUE"); err != nil {
 		return date, err
 	}
-	data.Get("CODE").String()
-	data = a.group(a.base, data.Pick("CODE", "VALUE"))
+	data.Get("ID").String()
+	data = a.group(a.base, data.Pick("ID", "VALUE"))
 	a.data.Set(FormatDate(date), data.Get("VALUE"))
 
 	path := filepath.Join(a.path, "data.csv")
@@ -157,9 +157,9 @@ func (a *Report) Stat(s, e time.Time) (dt.List, error) {
 			return false
 		}
 		return !date.Before(s) && date.Before(e)
-	}).GroupBy("CODE").Apply("VALUE", "VALUE", dt.Sum).Do()
+	}).GroupBy("ID").Apply("VALUE", "VALUE", dt.Sum).Do()
 
-	return a.base.Join(adjust, "CODE").Do("A_").
+	return a.base.Join(adjust, "ID").Do("A_").
 		Set("S_VALUE", a.data.Get(skey)).
 		Set("E_VALUE", a.data.Get(ekey)).
 		FillNA(dt.Number(0), "A_VALUE").

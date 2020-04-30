@@ -27,8 +27,8 @@ func FormatDate(t time.Time) string {
 
 // Group is the default group function.
 func Group(base, data *dt.Frame) *dt.Frame {
-	data = base.Join(data, "CODE").Do("D_").
-		Pick("CODE", "LEVEL", "SUPER", "D_VALUE").
+	data = base.Join(data, "ID").Do("D_").
+		Pick("ID", "LEVEL", "SUPER", "D_VALUE").
 		Rename("D_VALUE", "VALUE").
 		FillNA(dt.Number(0), "VALUE")
 
@@ -37,13 +37,13 @@ func Group(base, data *dt.Frame) *dt.Frame {
 			return r.Number("LEVEL") == l
 		}).GroupBy("SUPER").Apply("VALUE", "SUM", dt.Sum).Do()
 
-		data = data.Join(t, "SUPER").On("CODE").Do("").
+		data = data.Join(t, "SUPER").On("ID").Do("").
 			FillNA(dt.Number(0)).
 			MapTo("VALUE", func(r dt.Record) dt.Value {
 				return dt.Number(r.Number("VALUE") + r.Number("SUM"))
-			}).Pick("CODE", "LEVEL", "SUPER", "VALUE")
+			}).Pick("ID", "LEVEL", "SUPER", "VALUE")
 	}
-	return data.Pick("CODE", "VALUE")
+	return data.Pick("ID", "VALUE")
 }
 
 func bakup(name string) (string, error) {
