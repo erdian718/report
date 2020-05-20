@@ -40,7 +40,7 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 	if err != nil {
 		return nil, err
 	}
-	if err := base.Check("ID", "SUPER", "TARGET"); err != nil {
+	if err := base.Check("ID", "LEVEL", "SUPER", "TARGET"); err != nil {
 		return nil, err
 	}
 	base.Get("ID").String()
@@ -68,6 +68,8 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 	if err := schedule.Check("DATE", "VALUE"); err != nil {
 		return nil, err
 	}
+	schedule.Get("DATE").String()
+	schedule.Get("VALUE").Number()
 	schedule.Sort(func(x, y dt.Record) bool {
 		return x.String("DATE") < y.String("DATE")
 	}).FillNA(dt.Number(1), "VALUE")
@@ -93,7 +95,9 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 	if err := adjust.Check("DATE", "ID", "VALUE"); err != nil {
 		return nil, err
 	}
+	adjust.Get("DATE").String()
 	adjust.Get("ID").String()
+	adjust.Get("VALUE").Number()
 
 	return &Report{
 		path:     path,
@@ -123,6 +127,7 @@ func (a *Report) Feed(name string) (time.Time, error) {
 		return date, err
 	}
 	data.Get("ID").String()
+	data.Get("VALUE").Number()
 	data = a.group(a.base, data.Pick("ID", "VALUE"))
 	a.data.Set(FormatDate(date), data.Get("VALUE"))
 

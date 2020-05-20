@@ -38,7 +38,7 @@ func Group(base, data *dt.Frame) *dt.Frame {
 		}).GroupBy("SUPER").Apply("VALUE", "SUM", dt.Sum).Do()
 
 		data = data.Join(t, "SUPER").On("ID").Do("").
-			FillNA(dt.Number(0)).
+			FillNA(dt.Number(0), "SUM").
 			MapTo("VALUE", func(r dt.Record) dt.Value {
 				return dt.Number(r.Number("VALUE") + r.Number("SUM"))
 			}).Pick("ID", "LEVEL", "SUPER", "VALUE")
