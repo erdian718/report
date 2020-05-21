@@ -223,17 +223,22 @@ func (a *Report) value(d time.Time) dt.List {
 
 	var d1, d2 time.Time
 	var v1, v2 dt.List
-	for d1 = d.AddDate(0, 0, -1); !d1.Before(a.sdate); d1.AddDate(0, 0, -1) {
+	for i := 1; i < 16; i++ {
+		d1 = d.AddDate(0, 0, -i)
 		if key := FormatDate(d1); a.data.Has(key) {
 			v1 = a.data.Get(key)
+			break
 		}
 	}
 	if v1 == nil {
 		panic("report: invalid date: " + FormatDate(d))
 	}
-	for d2 = d.AddDate(0, 0, 1); d2.Before(a.edate); d2.AddDate(0, 0, 1) {
+
+	for i := 1; i < 16; i++ {
+		d2 = d.AddDate(0, 0, i)
 		if key := FormatDate(d2); a.data.Has(key) {
 			v2 = a.data.Get(key)
+			break
 		}
 	}
 	if v2 == nil {
