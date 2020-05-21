@@ -20,7 +20,7 @@ type Report struct {
 	sdate    time.Time
 	edate    time.Time
 	base     *dt.Frame // ID[, NAME], LEVEL, SUPER, TARGET
-	data     *dt.Frame // ID, 20060102, ...
+	data     *dt.Frame // ID, 20060102, 20060103, ...
 	schedule *dt.Frame // DATE, VALUE
 	adjust   *dt.Frame // DATE, ID[, NAME], VALUE
 }
