@@ -56,10 +56,7 @@ func Load(path string, feed func(string) (time.Time, *dt.Frame, error), group fu
 		return nil, err
 	}
 	data.Get("ID").String()
-	data = base.Pick("ID").Rename("ID", "BID").
-		Join(data, "ID").On("BID").Do("").
-		Del("ID").Rename("BID", "ID").
-		FillNA(dt.Number(0))
+	data = base.Pick("ID").Join(data, "ID").Do("").FillNA(dt.Number(0))
 
 	schedule, err := xr.ReadFile(filepath.Join(path, "schedule.xlsx"))
 	if err != nil {

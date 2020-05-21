@@ -27,9 +27,8 @@ func FormatDate(t time.Time) string {
 
 // Group is the default group function.
 func Group(base, data *dt.Frame) *dt.Frame {
-	data = base.Join(data, "ID").Do("D_").
-		Pick("ID", "LEVEL", "SUPER", "D_VALUE").
-		Rename("D_VALUE", "VALUE").
+	data = base.Join(data, "ID").Do("").
+		Pick("ID", "LEVEL", "SUPER", "VALUE").
 		FillNA(dt.Number(0), "VALUE")
 
 	for l := dt.Max(data.Get("LEVEL")).Number(); l >= 0; l-- {
